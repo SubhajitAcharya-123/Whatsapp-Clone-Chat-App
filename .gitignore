@@ -11,6 +11,7 @@ target/
 *.log
 .idea/
 *.class
+uploads/
 
 # frontend
 node_modules/

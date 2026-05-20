@@ -24,7 +24,8 @@ public class FileController {
         String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
 
         Path path = Paths.get(UPLOAD_DIR + fileName);
-
+        System.out.println("SAVING TO:");
+        System.out.println(path.toAbsolutePath());
         Files.createDirectories(path.getParent());
         Files.write(path, file.getBytes());
 

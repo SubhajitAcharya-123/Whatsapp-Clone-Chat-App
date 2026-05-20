@@ -250,3 +250,14 @@
   max-height: 90%;
   border-radius: 10px;
 }
+.error-toast{
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #ff4d4f;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 8px;
+  z-index: 9999;
+  font-size: 14px;
+}

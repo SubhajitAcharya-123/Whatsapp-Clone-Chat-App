@@ -29,9 +29,17 @@ function Chat() {
   const prevHeightRef = useRef(0);
   let typingTimeout = useRef(null);
   const activeChatRef = useRef(null);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const userData = JSON.parse(localStorage.getItem("user"));
 
+  const showError = (msg) => {
+    setErrorMessage(msg);
+
+    setTimeout(() => {
+      setErrorMessage("");
+    }, 3000);
+  };
   useEffect(() => {
     if (!userData) {
       window.location.href = "/";
@@ -161,7 +169,8 @@ function Chat() {
         let data3 = await res3.json();
         setUnread(data3);
       } catch (e) {
-        console.log("Error loading contacts", e);
+        console.error("Error loading contacts", e);
+        showError("Failed to load contacts");
       }
     };
 
@@ -209,6 +218,7 @@ function Chat() {
 
     } catch (e) {
       console.log("Error adding contact", e);
+      showError("Failed to add contact");
     }
   };
 
@@ -271,6 +281,7 @@ function Chat() {
     let res = await authFetch(`http://localhost:8080/api/chat/${roomId}?page=${pageNum}&size=20`);
     if (!res.ok) {
       console.log("API ERROR:", res.status);
+      showError("Failed to load messages");
       return;
     }
     let data = await res.json();
@@ -344,6 +355,7 @@ function Chat() {
 
       onStompError: (frame) => {
         console.error("Broker error:", frame);
+        showError("Connection problem");
       }
     });
 
@@ -398,7 +410,7 @@ function Chat() {
     );
 
     return () => {
-      subscription.unsubscribe(); 
+      subscription.unsubscribe();
     };
 
   }, [roomId, connected]);
@@ -476,72 +488,81 @@ function Chat() {
 
   // Send via WebSocket
   const sendMessage = async () => {
-    if (!text.trim() && !file) return;
-    if (file && file.size > 20 * 1024 * 1024) {
-      alert("File too large! Max 20MB");
-      return;
-    }
-    if (!username.trim()) {
-      alert("Enter a valid name");
-      return;
-    }
-
-    if (!connected) {
-      console.log("Not connected yet!");
-      return;
-    }
-
-    let fileUrl = null;
-    let fileType = null;
-    if (file) {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const res = await fetch("http://localhost:8080/api/file/upload", {
-        method: "POST",
-        body: formData
-      });
-
-      if (!res.ok) {
-        console.log("Upload failed:", res.status);
+    try {
+      if (!text.trim() && !file) return;
+      if (file && file.size > 20 * 1024 * 1024) {
+        alert("File too large! Max 20MB");
+        return;
+      }
+      if (!username.trim()) {
+        alert("Enter a valid name");
         return;
       }
 
-      const data = await res.json();
-      console.log("UPLOAD SUCCESS:", data);
-      fileUrl = data.url;
-
-      if (file.type.startsWith("image")) {
-        fileType = "image";
-      } else {
-        fileType = "file";
+      if (!connected) {
+        console.log("Not connected yet!");
+        return;
       }
+
+      let fileUrl = null;
+      let fileType = null;
+      if (file) {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const res = await fetch("http://localhost:8080/api/file/upload", {
+          method: "POST",
+          body: formData
+        });
+
+        if (!res.ok) {
+          console.log("Upload failed:", res.status);
+          return;
+        }
+
+        const data = await res.json();
+        console.log("UPLOAD SUCCESS:", data);
+        fileUrl = data.url;
+
+        if (file.type.startsWith("image")) {
+          fileType = "image";
+        } else {
+          fileType = "file";
+        }
+      }
+      stompClient.current.publish({
+        destination: `/app/send/${roomId}`,
+        body: JSON.stringify({
+          content: text,
+          fileUrl: fileUrl,
+          fileType: fileType
+        })
+      });
+
+      if (!activeChat) return;
+      setLastMessages(prev => ({
+        ...prev,
+        [activeChat]: {
+          text: text,
+          time: new Date().toISOString()
+        }
+      }));
+
+      setText("");
+      setFile(null);
+    } catch (e) {
+      console.error("Send failed", e);
+      showError("Failed to send message");
     }
-    stompClient.current.publish({
-      destination: `/app/send/${roomId}`,
-      body: JSON.stringify({
-        content: text,
-        fileUrl: fileUrl,
-        fileType: fileType
-      })
-    });
-
-    if (!activeChat) return;
-    setLastMessages(prev => ({
-      ...prev,
-      [activeChat]: {
-        text: text,
-        time: new Date().toISOString()
-      }
-    }));
-
-    setText("");
-    setFile(null);
   };
-  
+
   return (
     <div className="app">
-
+      {errorMessage && (
+        <div className="error-toast">
+          {errorMessage}
+        </div>
+      )}
       {/* SIDEBAR */}
       {(!isMobile || showSidebar) && (
         <div className="sidebar">
@@ -617,7 +638,7 @@ function Chat() {
                   <button onClick={() => {
                     setShowSidebar(true);
                     setActiveChat(null);
-                    setRoomId(null);        
+                    setRoomId(null);
                     setMessages([]);
                   }}>
                     ← Back
@@ -647,6 +668,7 @@ function Chat() {
 
                     {/* IMAGE MESSAGE */}
                     {m.fileType === "image" && (
+                      console.log("IMAGE URL:", m.fileUrl),
                       <img
                         src={m.fileUrl}
                         alt="img"

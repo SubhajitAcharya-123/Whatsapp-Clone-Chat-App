@@ -29,8 +29,12 @@ public class JwtFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
 
         String path = request.getRequestURI();
+        if(path.startsWith("/uploads/")){
+            System.out.println("REQUEST: " + request.getRequestURI());
+        }
 
-        if (path.startsWith("/api/file")) {
+        if (path.startsWith("/api/file") || path.startsWith("/uploads/")) {
+            System.out.println("BYPASSING JWT FOR: " + path);
             filterChain.doFilter(request, response);
             return;
         }
