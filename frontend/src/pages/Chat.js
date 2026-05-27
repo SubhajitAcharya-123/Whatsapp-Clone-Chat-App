@@ -1,6 +1,6 @@
 
 import "../styles/Chat.css";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useLayoutEffect, useRef } from "react";
 import SockJS from "sockjs-client";
 import { Client } from "@stomp/stompjs";
 import authFetch from "../utils/authFetch";
@@ -25,11 +25,16 @@ function Chat() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [showSidebar, setShowSidebar] = useState(true);
   const [file, setFile] = useState(null);
-  const [previewImage, setPreviewImage] = useState(null);
+  const [preview, setPreview] = useState(null);
   const prevHeightRef = useRef(0);
   let typingTimeout = useRef(null);
   const activeChatRef = useRef(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const loadingRef = useRef(false);
+  const initialLoadRef = useRef(true);
+  const previousHeightRef = useRef(0);
+
 
   const userData = JSON.parse(localStorage.getItem("user"));
 
@@ -45,7 +50,25 @@ function Chat() {
       window.location.href = "/";
     }
   }, []);
+  useEffect(() => {
+    if (page > 0) {
+      loadMessages(page);
+    }
+  }, [page]);
+  useEffect(() => {
+    if (!roomId || !connected) return;
 
+    initialLoadRef.current = true;
+    setMessages([]);
+    setPage(0);
+    setHasMore(true);
+
+    loadMessages(0).finally(() => {
+      setTimeout(() => {
+        initialLoadRef.current = false;
+      }, 100);
+    });
+  }, [roomId, connected]);
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
@@ -101,31 +124,41 @@ function Chat() {
   }, [connected, roomId]);
 
   useEffect(() => {
+    const chatDiv = chatRef.current;
+    if (!chatDiv) return;
     const handleScroll = () => {
-      if (!chatRef.current || !hasMore) return;
 
-      if (chatRef.current.scrollTop === 0) {
-        setPage(prev => {
-          const next = prev + 1;
-          loadMessages(next);
-          return next;
-        });
+      if (!chatDiv || !hasMore || loadingRef.current || initialLoadRef.current) return;
+
+      if (chatRef.current.scrollTop <= 5) {
+        console.log("TOP HIT", "page=", page);
+        previousHeightRef.current = chatRef.current.scrollHeight;
+        setPage(prev => prev + 1);
       }
     };
+
+    chatDiv.addEventListener("scroll", handleScroll);
+
+    return () => {
+      chatDiv.removeEventListener("scroll", handleScroll);
+    };
+  }, [hasMore, page, roomId]);
+  useLayoutEffect(() => {
+    if (page === 0) return;
+    if (!chatRef.current || !previousHeightRef.current) return;
 
     const chatDiv = chatRef.current;
 
-    if (chatDiv) {
-      chatDiv.addEventListener("scroll", handleScroll);
-    }
+    // Calculate how much new content was added to the top
+    const newHeight = chatDiv.scrollHeight;
+    const heightDifference = newHeight - previousHeightRef.current;
 
-    return () => {
-      if (chatDiv) {
-        chatDiv.removeEventListener("scroll", handleScroll);
-      }
-    };
-  }, [hasMore]);
+    // Seamlessly adjust the scroll pointer so the user stays in the exact same visual spot
+    chatDiv.scrollTop = heightDifference;
 
+    // Clear the ref until the next top-hit event
+    previousHeightRef.current = null;
+  }, [messages]);
   useEffect(() => {
     if (!username) return;
 
@@ -155,11 +188,25 @@ function Chat() {
         // 2. Load last messages (NEW)
         let res2 = await authFetch(`http://localhost:8080/api/chat/lastMessages`);
         let data2 = await res2.json();
-
+        console.log("LAST MESSAGES API:", data2);
         const map = {};
         data2.forEach(m => {
+          let previewText = m.text?.trim();
+
+          if (!previewText) {
+            if (m.fileType === "image") {
+              previewText = "📷 Photo";
+            } else if (m.fileType === "pdf") {
+              previewText = "📄 PDF";
+            } else if (m.fileType === "file") {
+              previewText = "📎 File";
+            } else {
+              previewText = "No messages yet";
+            }
+          }
+
           map[m.contact] = {
-            text: m.text,
+            text: previewText,
             time: m.timestamp
           };
         });
@@ -238,10 +285,10 @@ function Chat() {
         roomId: room
       })
     });
-
-    setMessages([]);
-    setPage(0);          //  reset page
-    setHasMore(true);    //  reset pagination
+    // initialLoadRef.current = true;
+    // setMessages([]);
+    // setPage(0);          //  reset page
+    // setHasMore(true);    //  reset pagination
     setActiveChat(contact);
     setRoomId(room); // set at last
 
@@ -255,71 +302,142 @@ function Chat() {
     setRoomId(room);
   };
 
+  // useEffect(() => {
+  //   if (roomId && connected) {
+  //     loadMessages(0);   // ✅ correct timing
+  //   }
+  // }, [roomId, connected]);
+
+  // useEffect(() => {
+  //   if (!chatRef.current) return;
+
+  //   // only for first page (initial load)
+  //   if (page === 0) {
+  //     console.log(
+  //     "INITIAL SCROLL",
+  //     "scrollHeight=",
+  //     chatRef.current.scrollHeight
+  //   );
+  //     setTimeout(() => {
+  //       chatRef.current.scrollTop = chatRef.current.scrollHeight;
+  //       initialLoadRef.current = false;
+  //       console.log(
+  //       "AFTER INITIAL SCROLL",
+  //       "scrollTop=",
+  //       chatRef.current.scrollTop
+  //     );
+  //     }, 50);
+  //   }
+  // }, [messages, page]);
   useEffect(() => {
-    if (roomId && connected) {
-      loadMessages(0);   // ✅ correct timing
-    }
-  }, [roomId, connected]);
-
-  useEffect(() => {
-    if (!chatRef.current) return;
-
-    // only for first page (initial load)
-    if (page === 0) {
-      setTimeout(() => {
-        chatRef.current.scrollTop = chatRef.current.scrollHeight;
-      }, 50);
-    }
-  }, [messages, page]);
-
+    if (!roomId) return;
+    console.log("ROOM:", roomId, "PAGE:", page);
+  }, [roomId, page]);
   // ✅ Load old messages (KEEP REST)
   const loadMessages = async (pageNum = 0) => {
-    if (!roomId) {
-      console.log("❌ roomId missing");
-      return;
-    }
-    let res = await authFetch(`http://localhost:8080/api/chat/${roomId}?page=${pageNum}&size=20`);
-    if (!res.ok) {
-      console.log("API ERROR:", res.status);
-      showError("Failed to load messages");
-      return;
-    }
-    let data = await res.json();
+    console.log("LOAD REQUEST", roomId, pageNum, "loading:", loadingRef.current, "messages:", messages.length);
+    if (loadingRef.current) return;
 
-    console.log("API RESPONSE:", data); // 🔥 DEBUG
+    loadingRef.current = true;
+    try {
+      console.log("LOADING PAGE:", pageNum);
+      console.log("LOAD", roomId, "PAGE", pageNum, "TIME", Date.now());
+      if (!roomId) {
+        console.log("❌ roomId missing");
+        return;
+      }
+      let res = await authFetch(`http://localhost:8080/api/chat/${roomId}?page=${pageNum}&size=20`);
+      if (!res.ok) {
+        console.log("API ERROR:", res.status);
+        showError("Failed to load messages");
+        return;
+      }
+      let data = await res.json();
 
-    if (!Array.isArray(data.content)) {
-      setMessages([]);
-      return;
-    }
+      console.log("API RESPONSE:", data); // 🔥 DEBUG
 
-    // IMPORTANT: reverse because backend is DESC
-    const newMessages = [...data.content].reverse();
+      if (!Array.isArray(data.content)) {
+        setMessages([]);
+        return;
+      }
 
-    if (pageNum === 0) {
-      setMessages(newMessages);
-    } else {
-      setMessages(prev => [...newMessages, ...prev]);
-    }
+      // IMPORTANT: reverse because backend is DESC
+      const newMessages = [...data.content].reverse();
+      console.log(
+        "NEW PAGE IDS:",
+        newMessages.map(m => m.id)
+      );
+      if (pageNum === 0) {
+        setMessages(newMessages);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (chatRef.current) {
+              console.log(
+                "AUTO SCROLL",
+                chatRef.current.scrollHeight
+              );
+              chatRef.current.scrollTop =
+                chatRef.current.scrollHeight;
+              console.log(
+                "AFTER AUTO SCROLL",
+                chatRef.current.scrollTop
+              );
+              initialLoadRef.current = false;
+            }
+          });
+        });
+      } else {
+        setMessages(prev => {
+          const existing = new Set(prev.map(m => m.id));
 
-    setHasMore(!data.last);
+          const unique = newMessages.filter(
+            m => !existing.has(m.id)
+          );
+          console.log(
+            "ADDING",
+            unique.length,
+            "OLD MESSAGES"
+          );
+          return [...unique, ...prev];
+        });
+      }
 
-    const msgs = Array.isArray(data.content) ? data.content : data;
+      setHasMore(!data.last);
 
-    if (msgs.length > 0) {
-      const lastMsg = msgs[msgs.length - 1];
+      const msgs = Array.isArray(data.content) ? data.content : data;
 
-      const [user1, user2] = roomId.split("_");
-      const otherUser =
-        lastMsg.sender === user1 ? user2 : user1;
+      if (pageNum == 0 && msgs.length > 0) {
+        const lastMsg = [...data.content].sort(
+          (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+        )[0];
+        console.log("last Message :", lastMsg.content, lastMsg.timestamp)
+        const [user1, user2] = roomId.split("_");
+        const otherUser =
+          lastMsg.sender === user1 ? user2 : user1;
+        let previewText = lastMsg.content?.trim();
 
-      setLastMessages(prev => ({
-        ...prev,
-        [otherUser]: {
-          text: lastMsg.content,
-          time: lastMsg.timestamp
+        if (!previewText) {
+          if (lastMsg.fileType === "image") {
+            previewText = "📷 Photo";
+          } else if (lastMsg.fileType === "pdf") {
+            previewText = "📄 PDF";
+          } else if (lastMsg.fileType === "file") {
+            previewText = "📎 File";
+          } else {
+            previewText = "No messages yet";
+          }
         }
-      }));
+
+        setLastMessages(prev => ({
+          ...prev,
+          [otherUser]: {
+            text: previewText,
+            time: lastMsg.timestamp
+          }
+        }));
+      }
+    } finally {
+      loadingRef.current = false;
     }
   };
   useEffect(() => {
@@ -378,7 +496,15 @@ function Chat() {
       (msg) => {
         const message = JSON.parse(msg.body);
 
-        setMessages(prev => [...prev, message]);
+        setMessages(prev => {
+          const exists = prev.some(m => m.id === message.id);
+
+          if (exists) {
+            return prev;
+          }
+
+          return [...prev, message];
+        });
 
         if (
           message.sender !== username
@@ -398,11 +524,24 @@ function Chat() {
 
         const otherUser = message.sender === user1 ? user2 : user1;
         if (!otherUser) return;
+        let previewText = message.content?.trim();
+
+        if (!previewText) {
+          if (message.fileType === "image") {
+            previewText = "📷 Photo";
+          } else if (message.fileType === "pdf") {
+            previewText = "📄 PDF";
+          } else if (message.fileType === "file") {
+            previewText = "📎 File";
+          } else {
+            previewText = "No messages yet";
+          }
+        }
         setLastMessages(prev => ({
           ...prev,
 
           [otherUser]: {
-            text: message.content,
+            text: previewText,
             time: message.timestamp
           }
         }));
@@ -410,6 +549,7 @@ function Chat() {
     );
 
     return () => {
+      console.log("UNSUBSCRIBE:", roomId);
       subscription.unsubscribe();
     };
 
@@ -490,8 +630,8 @@ function Chat() {
   const sendMessage = async () => {
     try {
       if (!text.trim() && !file) return;
-      if (file && file.size > 20 * 1024 * 1024) {
-        alert("File too large! Max 20MB");
+      if (file && file.size > 10 * 1024 * 1024) {
+        alert("File too large! Max 10MB");
         return;
       }
       if (!username.trim()) {
@@ -507,28 +647,29 @@ function Chat() {
       let fileUrl = null;
       let fileType = null;
       if (file) {
-        const formData = new FormData();
-        formData.append("file", file);
+        try {
+          setUploading(true);
+          const formData = new FormData();
+          formData.append("file", file);
 
-        const res = await fetch("http://localhost:8080/api/file/upload", {
-          method: "POST",
-          body: formData
-        });
+          const res = await fetch("http://localhost:8080/api/file/upload", {
+            method: "POST",
+            body: formData
+          });
 
-        if (!res.ok) {
-          console.log("Upload failed:", res.status);
-          return;
+          if (!res.ok) {
+            console.log("Upload failed:", res.status);
+            return;
+          }
+
+          const data = await res.json();
+          console.log("UPLOAD SUCCESS:", data);
+          fileUrl = data.url;
+          fileType = data.fileType;
+        } finally {
+          setUploading(false);
         }
 
-        const data = await res.json();
-        console.log("UPLOAD SUCCESS:", data);
-        fileUrl = data.url;
-
-        if (file.type.startsWith("image")) {
-          fileType = "image";
-        } else {
-          fileType = "file";
-        }
       }
       stompClient.current.publish({
         destination: `/app/send/${roomId}`,
@@ -540,10 +681,17 @@ function Chat() {
       });
 
       if (!activeChat) return;
+      let previewText = text.trim();
+
+      if (!previewText) {
+        if (fileType === "image") previewText = "📷 Photo";
+        else if (fileType === "pdf") previewText = "📄 PDF";
+        else if (fileType === "file") previewText = "📎 File";
+      }
       setLastMessages(prev => ({
         ...prev,
         [activeChat]: {
-          text: text,
+          text: previewText,
           time: new Date().toISOString()
         }
       }));
@@ -658,7 +806,22 @@ function Chat() {
 
               {/* MESSAGES */}
               <div ref={chatRef} className="messages">
+                {console.log(
+                  "MESSAGE IDS:",
+                  messages.map(m => m.id)
+                )}
+                {loadingRef.current && page > 0 && (
+                  <div className="history-loading-spinner">
+                    <span className="spinner-circle"></span>
+                    Loading older messages...
+                  </div>
+                )}
                 {messages.map((m) => (
+                  // console.log("FILE TYPE =", m.fileType),
+                  console.log(
+                    "RENDER COUNT:",
+                    messages.length
+                  ),
                   <div
                     key={m.id}
                     className={`message ${m.sender === username ? "sent" : "received"
@@ -668,20 +831,54 @@ function Chat() {
 
                     {/* IMAGE MESSAGE */}
                     {m.fileType === "image" && (
-                      console.log("IMAGE URL:", m.fileUrl),
-                      <img
-                        src={m.fileUrl}
-                        alt="img"
-                        className="chat-image"
-                        onClick={() => setPreviewImage(m.fileUrl)}
-                      />
+                      <>
+                        {console.log("IMAGE URL:", m.fileUrl)}
+                        <img
+                          src={m.fileUrl}
+                          alt="img"
+                          height={250}
+                          width={250}
+                          className="chat-image"
+                          onLoad={(e) => {
+                            console.log(
+                              "IMAGE SIZE",
+                              e.target.naturalWidth,
+                              e.target.naturalHeight
+                            );
+
+                          }}
+                          onClick={() =>
+                            setPreview({
+                              type: "image",
+                              url: m.fileUrl
+                            })}
+                        />
+                      </>
                     )}
 
                     {/* FILE */}
-                    {m.fileType === "file" && (
-                      <a href={m.fileUrl} target="_blank" rel="noreferrer">
-                        📎 Download File
-                      </a>
+                    {(m.fileType === "file" || m.fileType === "pdf") && (
+                      <div className="file-card">
+                        📄 Document
+
+                        <div className="file-actions">
+                          <button onClick={() => {
+                            console.log("PREVIEW URL:", m.fileUrl);
+                            setPreview({
+                              type: m.fileType,
+                              url: m.fileUrl
+                            });
+                            console.log("PREVIEW IS :", preview);
+                          }
+                          }>
+                            Preview
+                          </button>
+
+                          <a href={m.fileUrl} target="_blank" rel="noreferrer" download>
+                            Download
+                          </a>
+                        </div>
+                      </div>
                     )}
 
                     <div className="meta">
@@ -696,10 +893,45 @@ function Chat() {
                   </div>
                 ))}
               </div>
-
+              {preview && (
+                <div
+                  className="modal"
+                  onClick={() => setPreview(null)}
+                >
+                  <div
+                    className="modal-content"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button className="close-btn" onClick={() => setPreview(null)}>
+                      ✕
+                    </button>
+                    {preview.type === "image" ? (
+                      <img src={preview.url} style={{ width: "100%" }} />
+                    ) : (preview.type === "pdf" || preview.type === "file") ? (
+                      <iframe
+                        src={preview.url}
+                        width="100%"
+                        height="600px"
+                      />
+                    ) : (
+                      <div>
+                        <p>File cannot be previewed</p>
+                        <a href={preview.url} download>
+                          Download
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               {file && (
                 <div style={{ fontSize: "12px", color: "gray", padding: "5px 10px" }}>
                   Selected: {file.name}
+                </div>
+              )}
+              {uploading && (
+                <div className="uploading-msg">
+                  ⏳ Uploading file, please wait...
                 </div>
               )}
               {/* INPUT */}
@@ -741,7 +973,7 @@ function Chat() {
                   placeholder="Type a message..."
                 />
 
-                <button onClick={sendMessage} disabled={!connected}>
+                <button onClick={sendMessage} disabled={!connected || uploading}>
                   Send
                 </button>
               </div>
@@ -749,14 +981,7 @@ function Chat() {
           )}
         </div>
       )}
-      {previewImage && (
-        <div
-          className="image-modal"
-          onClick={() => setPreviewImage(null)}
-        >
-          <img src={previewImage} alt="preview" />
-        </div>
-      )}
+
     </div>
   );
 }

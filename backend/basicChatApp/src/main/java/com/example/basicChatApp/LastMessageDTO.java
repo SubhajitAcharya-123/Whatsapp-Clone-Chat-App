@@ -7,20 +7,31 @@ public class LastMessageDTO {
     private String contact;
     private String text;
     private LocalDateTime timestamp;
+    private String fileType;
 
-    public LastMessageDTO(String contact, String text, LocalDateTime timestamp) {
+    public LastMessageDTO(String contact, String text, LocalDateTime timestamp, String fileType) {
         this.contact = contact;
         this.text = text;
         this.timestamp = timestamp;
+        this.fileType = fileType;
     }
 
     public LastMessageDTO() {
     }
 
-    public LastMessageDTO(String text, LocalDateTime timestamp, String contact) {
+    public LastMessageDTO(String text, LocalDateTime timestamp, String contact, String fileType) {
         this.text = text;
         this.timestamp = timestamp;
         this.contact = contact;
+        this.fileType = fileType;
+    }
+
+    public String getFileType() {
+        return fileType;
+    }
+
+    public void setFileType(String fileType) {
+        this.fileType = fileType;
     }
 
     public String getContact() {

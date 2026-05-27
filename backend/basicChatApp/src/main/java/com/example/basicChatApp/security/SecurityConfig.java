@@ -29,9 +29,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()   // ✅ allow register/login
                         .requestMatchers("/api/file/**").permitAll()   // ✅ allow upload
-                        .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers("/chat/**").permitAll()
                         .anyRequest().authenticated()
+//                        .requestMatchers("/uploads/**").permitAll()
                 )
 
                 // 🔥 ADD JWT FILTER HERE

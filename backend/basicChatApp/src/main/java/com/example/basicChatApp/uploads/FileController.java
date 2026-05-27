@@ -14,23 +14,24 @@ import java.util.Map;
 @CrossOrigin(origins = "http://localhost:3000")
 public class FileController {
 
-    private final String UPLOAD_DIR = "uploads/";
+    private final CloudinaryService cloudinaryService;
+
+    public FileController(
+            CloudinaryService cloudinaryService
+    ) {
+        this.cloudinaryService = cloudinaryService;
+    }
 
     @PostMapping("/upload")
     public Map<String, String> uploadFile(
             @RequestParam("file") MultipartFile file
     ) throws IOException {
 
-        String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
-
-        Path path = Paths.get(UPLOAD_DIR + fileName);
-        System.out.println("SAVING TO:");
-        System.out.println(path.toAbsolutePath());
-        Files.createDirectories(path.getParent());
-        Files.write(path, file.getBytes());
-
-        String fileUrl = "http://localhost:8080/uploads/" + fileName;
-
-        return Map.of("url", fileUrl);
+        Map<String, String> response = cloudinaryService.uploadFile(file);
+        System.out.println("in file controller before return : " + response.get("fileType"));
+        return Map.of(
+                "url", response.get("url"),
+                "fileType", response.get("fileType")
+        );
     }
 }

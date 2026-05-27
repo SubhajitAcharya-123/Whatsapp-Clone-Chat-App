@@ -51,7 +51,8 @@ public class MessageService {
             result.add(new LastMessageDTO(
                     contact,
                     m.getContent(),
-                    m.getTimestamp()
+                    m.getTimestamp(),
+                    m.getFileType()
             ));
         }
 
