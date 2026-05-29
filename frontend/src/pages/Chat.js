@@ -10,8 +10,8 @@ function Chat() {
   const [text, setText] = useState("");
   const stompClient = useRef(null);
   const [connected, setConnected] = useState(false);
-  // const [username, setUsername] = useState("");
-  // const [isJoined, setIsJoined] = useState(false);
+  const [isServerAwake, setIsServerAwake] = useState(false);
+  const [serverLoadingMessage, setServerLoadingMessage] = useState("Connecting to services...");
   const [roomId, setRoomId] = useState("");
   const [contacts, setContacts] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
@@ -37,7 +37,33 @@ function Chat() {
 
 
   const userData = JSON.parse(localStorage.getItem("user"));
+  useEffect(() => {
+    let pingInterval;
 
+    const checkServerStatus = async () => {
+      try {
+        // Attempt to ping the backend
+        const res = await fetch("http://localhost:8080/api/auth/ping"); // Update to your Render URL later!
+        
+        if (res.ok) {
+          console.log("Backend is awake!");
+          setIsServerAwake(true);
+          clearInterval(pingInterval); // Stop pinging once awake
+        }
+      } catch (error) {
+        console.log("Backend is sleeping. Waiting for spin-up...");
+        setServerLoadingMessage("Waking up server... This is hosted on a free cloud tier, so it may take up to 60 seconds. Thank you for your patience!");
+      }
+    };
+
+    // Check immediately on startup
+    checkServerStatus();
+
+    // If it's asleep, keep checking every 4 seconds
+    pingInterval = setInterval(checkServerStatus, 4000);
+
+    return () => clearInterval(pingInterval);
+  }, []);
   const showError = (msg) => {
     setErrorMessage(msg);
 
@@ -703,7 +729,17 @@ function Chat() {
       showError("Failed to send message");
     }
   };
-
+  if (!isServerAwake) {
+    return (
+      <div className="server-wakeup-overlay">
+        <div className="wakeup-box">
+          <div className="loading-spinner-large"></div>
+          <h2>{serverLoadingMessage}</h2>
+          <p>This behavior is standard for portfolio projects deployed on free application infrastructure.</p>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="app">
       {errorMessage && (
