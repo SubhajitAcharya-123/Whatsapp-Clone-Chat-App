@@ -43,7 +43,7 @@ function Chat() {
     const checkServerStatus = async () => {
       try {
         // Attempt to ping the backend
-        const res = await fetch("http://localhost:8080/api/auth/ping"); // Update to your Render URL later!
+        const res = await fetch("https://whatsapp-clone-chat-app.onrender.com/api/auth/ping"); // Update to your Render URL later!
         
         if (res.ok) {
           console.log("Backend is awake!");
@@ -119,7 +119,7 @@ function Chat() {
 
   const fetchUnread = async () => {
     if (!username) return;
-    let res = await authFetch(`http://localhost:8080/api/chat/unread`);
+    let res = await authFetch(`https://whatsapp-clone-chat-app.onrender.com/api/chat/unread`);
     let data = await res.json();
     setUnread(data);
   };
@@ -190,7 +190,7 @@ function Chat() {
 
     const loadContacts = async () => {
       try {
-        let res = await authFetch(`http://localhost:8080/api/chat/contacts`);
+        let res = await authFetch(`https://whatsapp-clone-chat-app.onrender.com/api/chat/contacts`);
 
 
         if (!res.ok) {
@@ -212,7 +212,7 @@ function Chat() {
         setContacts(names);
 
         // 2. Load last messages (NEW)
-        let res2 = await authFetch(`http://localhost:8080/api/chat/lastMessages`);
+        let res2 = await authFetch(`https://whatsapp-clone-chat-app.onrender.com/api/chat/lastMessages`);
         let data2 = await res2.json();
         console.log("LAST MESSAGES API:", data2);
         const map = {};
@@ -238,7 +238,7 @@ function Chat() {
         });
 
         setLastMessages(map);
-        let res3 = await authFetch(`http://localhost:8080/api/chat/unread`);
+        let res3 = await authFetch(`https://whatsapp-clone-chat-app.onrender.com/api/chat/unread`);
         let data3 = await res3.json();
         setUnread(data3);
       } catch (e) {
@@ -269,7 +269,7 @@ function Chat() {
     }
 
     try {
-      const res = await authFetch("http://localhost:8080/api/chat/contacts", {
+      const res = await authFetch("https://whatsapp-clone-chat-app.onrender.com/api/chat/contacts", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -301,7 +301,7 @@ function Chat() {
 
     console.log("SETTING ACTIVE:", username, room);
 
-    await authFetch(`http://localhost:8080/api/chat/active`, {
+    await authFetch(`https://whatsapp-clone-chat-app.onrender.com/api/chat/active`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -372,7 +372,7 @@ function Chat() {
         console.log("❌ roomId missing");
         return;
       }
-      let res = await authFetch(`http://localhost:8080/api/chat/${roomId}?page=${pageNum}&size=20`);
+      let res = await authFetch(`https://whatsapp-clone-chat-app.onrender.com/api/chat/${roomId}?page=${pageNum}&size=20`);
       if (!res.ok) {
         console.log("API ERROR:", res.status);
         showError("Failed to load messages");
@@ -468,7 +468,7 @@ function Chat() {
   };
   useEffect(() => {
     if (!username) return;
-    const socket = new SockJS(`http://localhost:8080/chat`);
+    const socket = new SockJS(`https://whatsapp-clone-chat-app.onrender.com/chat`);
     const token = localStorage.getItem("token");
     const client = new Client({
       webSocketFactory: () => socket,
@@ -490,7 +490,7 @@ function Chat() {
         });
 
         // initial fetch
-        authFetch("http://localhost:8080/api/chat/online")
+        authFetch("https://whatsapp-clone-chat-app.onrender.com/api/chat/online")
           .then(res => res.json())
           .then(data => setOnlineUsers(data));
 
@@ -535,7 +535,7 @@ function Chat() {
         if (
           message.sender !== username
         ) {
-          authFetch("http://localhost:8080/api/chat/active", {
+          authFetch("https://whatsapp-clone-chat-app.onrender.com/api/chat/active", {
             method: "POST",
             headers: {
               "Content-Type": "application/json"
@@ -623,7 +623,7 @@ function Chat() {
         const isChatOpen = activeChatRef.current === otherUser;
 
         if (message.sender !== username && !isChatOpen) {
-          authFetch("http://localhost:8080/api/chat/delivered", {
+          authFetch("https://whatsapp-clone-chat-app.onrender.com/api/chat/delivered", {
             method: "POST",
             headers: {
               "Content-Type": "application/json"
@@ -678,7 +678,7 @@ function Chat() {
           const formData = new FormData();
           formData.append("file", file);
 
-          const res = await fetch("http://localhost:8080/api/file/upload", {
+          const res = await fetch("https://whatsapp-clone-chat-app.onrender.com/api/file/upload", {
             method: "POST",
             body: formData
           });
