@@ -311,10 +311,7 @@ function Chat() {
         roomId: room
       })
     });
-    // initialLoadRef.current = true;
-    // setMessages([]);
-    // setPage(0);          //  reset page
-    // setHasMore(true);    //  reset pagination
+    
     setActiveChat(contact);
     setRoomId(room); // set at last
 
@@ -328,33 +325,7 @@ function Chat() {
     setRoomId(room);
   };
 
-  // useEffect(() => {
-  //   if (roomId && connected) {
-  //     loadMessages(0);   // ✅ correct timing
-  //   }
-  // }, [roomId, connected]);
-
-  // useEffect(() => {
-  //   if (!chatRef.current) return;
-
-  //   // only for first page (initial load)
-  //   if (page === 0) {
-  //     console.log(
-  //     "INITIAL SCROLL",
-  //     "scrollHeight=",
-  //     chatRef.current.scrollHeight
-  //   );
-  //     setTimeout(() => {
-  //       chatRef.current.scrollTop = chatRef.current.scrollHeight;
-  //       initialLoadRef.current = false;
-  //       console.log(
-  //       "AFTER INITIAL SCROLL",
-  //       "scrollTop=",
-  //       chatRef.current.scrollTop
-  //     );
-  //     }, 50);
-  //   }
-  // }, [messages, page]);
+  
   useEffect(() => {
     if (!roomId) return;
     console.log("ROOM:", roomId, "PAGE:", page);
@@ -748,7 +719,7 @@ function Chat() {
         </div>
       )}
       {/* SIDEBAR */}
-      {(!isMobile || showSidebar) && (
+      {(!isMobile || !activeChat) && (
         <div className="sidebar">
           <div>
             <h3>Welcome, {username}</h3>
@@ -807,7 +778,7 @@ function Chat() {
       )}
 
       {/* CHAT AREA */}
-      {(!isMobile || !showSidebar) && (
+      {(!isMobile || activeChat) && (
         <div className="chat-area">
 
           {(!isMobile && !activeChat) ? (
